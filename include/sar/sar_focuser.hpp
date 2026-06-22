@@ -6,6 +6,7 @@
 #include <sar/io/raw_echo_unpacker.hpp>
 #include <sar/fft/fft_engine.hpp>
 #include <sar/focusing/rd_focuser.hpp>
+#include <sar/polsar/polsar_decomposer.hpp>
 #include <sar/output/output_writers.hpp>
 #include <memory>
 #include <string>
@@ -53,6 +54,21 @@ public:
 
     void export_binary(const std::string& filepath) const;
 
+    void enable_polsar(bool enable) { polsar_enabled_ = enable; }
+    bool polsar_enabled() const noexcept { return polsar_enabled_; }
+
+    void load_polsar_channels(
+        const std::string& hh_file,
+        const std::string& hv_file,
+        const std::string& vh_file,
+        const std::string& vv_file,
+        UInt64 header_bytes = 0);
+
+    void run_polsar_decomposition();
+
+    const polsar::PolSARPipeline& polsar_pipeline() const noexcept { return polsar_pipeline_; }
+    polsar::PolSARPipeline& polsar_pipeline() noexcept { return polsar_pipeline_; }
+
     fft::FFTEngine& fft_engine() { return fft_engine_; }
     const fft::FFTEngine& fft_engine() const { return fft_engine_; }
 
@@ -79,6 +95,8 @@ private:
     focusing::DopplerEstimator doppler_est_;
     focusing::AzimuthCompressor azimuth_comp_;
 
+    polsar::PolSARPipeline polsar_pipeline_;
+
     output::BackscatterNormalizer normalizer_;
     output::GeoTIFFWriter geotiff_writer_;
     output::BinaryWriter  binary_writer_;
@@ -92,6 +110,7 @@ private:
     bool rcmc_done_      = false;
     bool azimuth_done_   = false;
     bool normalized_     = false;
+    bool polsar_enabled_ = false;
 };
 
 }

@@ -19,11 +19,17 @@
     <ClCompile Include="D:\SOLO-0621-1\15-sar-doppler-focuser\src\output\output_writers.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="D:\SOLO-0621-1\15-sar-doppler-focuser\src\polsar\polsar_decomposer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="D:\SOLO-0621-1\15-sar-doppler-focuser\src\sar_focuser.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="D:\SOLO-0621-1\15-sar-doppler-focuser\include\sar\common\alignment_watchdog.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="D:\SOLO-0621-1\15-sar-doppler-focuser\include\sar\common\common.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -55,6 +61,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="D:\SOLO-0621-1\15-sar-doppler-focuser\include\sar\output\output_writers.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\SOLO-0621-1\15-sar-doppler-focuser\include\sar\polsar\polsar_decomposer.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="D:\SOLO-0621-1\15-sar-doppler-focuser\include\sar\sar_focuser.hpp">

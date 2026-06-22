@@ -7,4 +7,5 @@ D:/SOLO-0621-1/15-sar-doppler-focuser/build/tests/CMakeFiles/test_sinc.dir
 D:/SOLO-0621-1/15-sar-doppler-focuser/build/tests/CMakeFiles/test_fft.dir
 D:/SOLO-0621-1/15-sar-doppler-focuser/build/tests/CMakeFiles/test_types.dir
 D:/SOLO-0621-1/15-sar-doppler-focuser/build/tests/CMakeFiles/test_pipeline.dir
+D:/SOLO-0621-1/15-sar-doppler-focuser/build/tests/CMakeFiles/test_polsar.dir
 D:/SOLO-0621-1/15-sar-doppler-focuser/build/tests/CMakeFiles/RUN_TESTS.dir

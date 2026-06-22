@@ -67,6 +67,9 @@ void SARDopplerFocuser::initialize() {
     normalizer_.set_progress_reporter(&progress_);
     geotiff_writer_.set_progress_reporter(&progress_);
     binary_writer_.set_progress_reporter(&progress_);
+    polsar_pipeline_.set_progress_reporter(&progress_);
+
+    polsar_pipeline_.configure(config_);
 
     const UInt64 rows = config_.metadata.azimuth_lines;
     const UInt64 cols = config_.metadata.range_samples;
@@ -223,6 +226,29 @@ void SARDopplerFocuser::run_full_pipeline() {
     run_azimuth_compression();
     if (config_.processing.verbose) std::cout << "[SAR] Azimuth compression complete" << std::endl;
 
+    if (polsar_enabled_) {
+        if (config_.processing.verbose) {
+            std::cout << "[SAR] Running Cloude-Pottier H-alpha PolSAR decomposition..." << std::endl;
+        }
+        polsar_pipeline_.run_decomposition();
+        const UInt64 oil_count = polsar_pipeline_.oil_pixel_count();
+        if (oil_count > 0) {
+            if (config_.processing.verbose) {
+                std::cout << "[SAR] POLSAR INTERVENTION: Detected " << oil_count
+                          << " oil-suspected pixels. Blocking backscatter for these regions." << std::endl;
+            }
+            const auto& intervention = polsar_pipeline_.intervention();
+            #pragma omp parallel for schedule(dynamic)
+            for (Int64 i = 0; i < static_cast<Int64>(intervention.oil_rows.size()); ++i) {
+                const UInt64 r = intervention.oil_rows[static_cast<size_t>(i)];
+                const UInt64 c = intervention.oil_cols[static_cast<size_t>(i)];
+                if (r < focused_.rows() && c < focused_.cols()) {
+                    focused_.at(r, c) = Complex(0.0f, 0.0f);
+                }
+            }
+        }
+    }
+
     run_normalization();
     if (config_.processing.verbose) std::cout << "[SAR] Normalization complete" << std::endl;
 
@@ -252,18 +278,69 @@ void SARDopplerFocuser::export_geotiff(const std::string& filepath) const {
     if (!normalized_) {
         throw InvalidParameterException("Image not yet normalized");
     }
-    if (output::GeoTIFFWriter::is_available()) {
+    if (output::GeoTIFFWriter::is_available() && polsar_enabled_ && polsar_pipeline_.has_oil_spill()) {
+        const UInt64 rows = focused_.rows();
+        const UInt64 cols = focused_.cols();
+        std::vector<UInt8> r(rows * cols);
+        std::vector<UInt8> g(rows * cols);
+        std::vector<UInt8> b(rows * cols);
+        output::BackscatterNormalizer norm(config_.processing);
+        std::vector<UInt8> gray;
+        norm.normalize_to_uint8(focused_, gray, true);
+        #pragma omp parallel for schedule(dynamic)
+        for (Int64 i = 0; i < static_cast<Int64>(rows * cols); ++i) {
+            const UInt8 v = gray[static_cast<size_t>(i)];
+            r[static_cast<size_t>(i)] = v;
+            g[static_cast<size_t>(i)] = v;
+            b[static_cast<size_t>(i)] = v;
+        }
+        polsar_pipeline_.render_oil_overlay(r, g, b, rows, cols);
+        geotiff_writer_.write_rgb(r, g, b, rows, cols, filepath, config_.georef);
+    } else if (output::GeoTIFFWriter::is_available()) {
         geotiff_writer_.write_float32(backscatter_, filepath, config_.georef);
     } else {
         std::vector<UInt8> u8;
         output::BackscatterNormalizer norm(config_.processing);
         norm.normalize_to_uint8(focused_, u8, true);
-        geotiff_writer_.write_uint8(u8, focused_.rows(), focused_.cols(), filepath, config_.georef);
+        if (polsar_enabled_ && polsar_pipeline_.has_oil_spill()) {
+            const UInt64 rows = focused_.rows();
+            const UInt64 cols = focused_.cols();
+            std::vector<UInt8> r(rows * cols);
+            std::vector<UInt8> g(rows * cols);
+            std::vector<UInt8> b(rows * cols);
+            #pragma omp parallel for schedule(dynamic)
+            for (Int64 i = 0; i < static_cast<Int64>(rows * cols); ++i) {
+                const UInt8 v = u8[static_cast<size_t>(i)];
+                r[static_cast<size_t>(i)] = v;
+                g[static_cast<size_t>(i)] = v;
+                b[static_cast<size_t>(i)] = v;
+            }
+            polsar_pipeline_.render_oil_overlay(r, g, b, rows, cols);
+            geotiff_writer_.write_rgb(r, g, b, rows, cols, filepath, config_.georef);
+        } else {
+            geotiff_writer_.write_uint8(u8, focused_.rows(), focused_.cols(), filepath, config_.georef);
+        }
     }
 }
 
 void SARDopplerFocuser::export_binary(const std::string& filepath) const {
     binary_writer_.write_real_matrix(backscatter_, filepath);
+}
+
+void SARDopplerFocuser::load_polsar_channels(
+    const std::string& hh_file,
+    const std::string& hv_file,
+    const std::string& vh_file,
+    const std::string& vv_file,
+    UInt64 header_bytes) {
+    if (!initialized_) initialize();
+    polsar_pipeline_.load_quad_polar_channels(hh_file, hv_file, vh_file, vv_file, header_bytes);
+    polsar_enabled_ = true;
+}
+
+void SARDopplerFocuser::run_polsar_decomposition() {
+    if (!initialized_) initialize();
+    polsar_pipeline_.run_decomposition();
 }
 
 }
