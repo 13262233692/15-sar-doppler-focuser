@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="D:\SOLO-0621-1\15-sar-doppler-focuser\build\CMakeFiles\8e7de76ffdcc1fc23e9638d3a59fb649\generate.stamp.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{542CC360-1F74-3C70-AE36-8B99A6121476}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

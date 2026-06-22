@@ -1,0 +1,75 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="D:\SOLO-0621-1\15-sar-doppler-focuser\src\common\config.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SOLO-0621-1\15-sar-doppler-focuser\src\fft\fft_engine.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SOLO-0621-1\15-sar-doppler-focuser\src\focusing\rd_focuser.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SOLO-0621-1\15-sar-doppler-focuser\src\io\mapped_file_reader.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SOLO-0621-1\15-sar-doppler-focuser\src\io\raw_echo_unpacker.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SOLO-0621-1\15-sar-doppler-focuser\src\output\output_writers.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\SOLO-0621-1\15-sar-doppler-focuser\src\sar_focuser.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="D:\SOLO-0621-1\15-sar-doppler-focuser\include\sar\common\common.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\SOLO-0621-1\15-sar-doppler-focuser\include\sar\common\config.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\SOLO-0621-1\15-sar-doppler-focuser\include\sar\common\exceptions.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\SOLO-0621-1\15-sar-doppler-focuser\include\sar\common\math_utils.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\SOLO-0621-1\15-sar-doppler-focuser\include\sar\common\progress.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\SOLO-0621-1\15-sar-doppler-focuser\include\sar\common\types.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\SOLO-0621-1\15-sar-doppler-focuser\include\sar\fft\fft_engine.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\SOLO-0621-1\15-sar-doppler-focuser\include\sar\focusing\rd_focuser.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\SOLO-0621-1\15-sar-doppler-focuser\include\sar\io\mapped_file_reader.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\SOLO-0621-1\15-sar-doppler-focuser\include\sar\io\raw_echo_unpacker.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\SOLO-0621-1\15-sar-doppler-focuser\include\sar\output\output_writers.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\SOLO-0621-1\15-sar-doppler-focuser\include\sar\sar_focuser.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="D:\SOLO-0621-1\15-sar-doppler-focuser\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{3EDC92B9-39E2-3142-BB7F-1B2EA75C1B2F}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{B949722B-AF11-3581-AA9C-CE1DC3A8D3E5}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

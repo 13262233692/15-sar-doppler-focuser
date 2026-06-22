@@ -1,0 +1,10 @@
+^D:\SOLO-0621-1\15-SAR-DOPPLER-FOCUSER\TESTS\CMAKELISTS.TXT
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SD:/SOLO-0621-1/15-sar-doppler-focuser -BD:/SOLO-0621-1/15-sar-doppler-focuser/build --check-stamp-file D:/SOLO-0621-1/15-sar-doppler-focuser/build/tests/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

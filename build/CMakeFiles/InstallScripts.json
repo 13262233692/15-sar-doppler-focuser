@@ -1,0 +1,8 @@
+{
+	"InstallScripts" : 
+	[
+		"D:/SOLO-0621-1/15-sar-doppler-focuser/build/cmake_install.cmake",
+		"D:/SOLO-0621-1/15-sar-doppler-focuser/build/tests/cmake_install.cmake"
+	],
+	"Parallel" : false
+}
