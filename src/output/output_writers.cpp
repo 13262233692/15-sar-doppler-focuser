@@ -131,12 +131,15 @@ void BackscatterNormalizer::normalize_to_uint8(
         Real thread_min = std::numeric_limits<Real>::infinity();
 
         #pragma omp for schedule(dynamic) nowait
-        for (Int64 i = 0; i < static_cast<Int64>(rows * cols); ++i) {
-            const Real amp = std::abs(focused.data()[i]);
-            const Real db = amp2db(amp);
-            db_vals[static_cast<size_t>(i)] = db;
-            if (db > thread_max) thread_max = db;
-            if (db < thread_min) thread_min = db;
+        for (Int64 r = 0; r < static_cast<Int64>(rows); ++r) {
+            for (UInt64 c = 0; c < cols; ++c) {
+                const UInt64 idx = static_cast<UInt64>(r) * cols + c;
+                const Real amp = std::abs(focused.at(static_cast<UInt64>(r), c));
+                const Real db = amp2db(amp);
+                db_vals[static_cast<size_t>(idx)] = db;
+                if (db > thread_max) thread_max = db;
+                if (db < thread_min) thread_min = db;
+            }
         }
 
         #pragma omp critical
@@ -184,7 +187,11 @@ void BinaryWriter::write_real_matrix(
 
     ofs.write(reinterpret_cast<const char*>(&rows), sizeof(UInt64));
     ofs.write(reinterpret_cast<const char*>(&cols), sizeof(UInt64));
-    ofs.write(reinterpret_cast<const char*>(mat.data()), sizeof(Real) * rows * cols);
+
+    for (UInt64 r = 0; r < rows; ++r) {
+        auto row_span = mat.row(r);
+        ofs.write(reinterpret_cast<const char*>(row_span.data()), sizeof(Real) * cols);
+    }
 
     if (!ofs) {
         throw IOException("Failed to write data to: " + filepath);
@@ -205,7 +212,11 @@ void BinaryWriter::write_complex_matrix(
 
     ofs.write(reinterpret_cast<const char*>(&rows), sizeof(UInt64));
     ofs.write(reinterpret_cast<const char*>(&cols), sizeof(UInt64));
-    ofs.write(reinterpret_cast<const char*>(mat.data()), sizeof(Complex) * rows * cols);
+
+    for (UInt64 r = 0; r < rows; ++r) {
+        auto row_span = mat.row(r);
+        ofs.write(reinterpret_cast<const char*>(row_span.data()), sizeof(Complex) * cols);
+    }
 
     if (!ofs) {
         throw IOException("Failed to write data to: " + filepath);
@@ -248,8 +259,10 @@ RealMatrix BinaryWriter::read_real_matrix(
     if (cols == 0) cols = c;
 
     RealMatrix mat(rows, cols);
-    const UInt64 n = std::min(rows * cols, r * c);
-    ifs.read(reinterpret_cast<char*>(mat.data()), sizeof(Real) * n);
+    for (UInt64 ri = 0; ri < rows; ++ri) {
+        auto row_span = mat.row(ri);
+        ifs.read(reinterpret_cast<char*>(row_span.data()), sizeof(Real) * cols);
+    }
 
     return mat;
 }

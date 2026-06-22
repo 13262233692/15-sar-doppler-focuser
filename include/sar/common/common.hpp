@@ -5,3 +5,4 @@
 #include <sar/common/math_utils.hpp>
 #include <sar/common/config.hpp>
 #include <sar/common/progress.hpp>
+#include <sar/common/alignment_watchdog.hpp>

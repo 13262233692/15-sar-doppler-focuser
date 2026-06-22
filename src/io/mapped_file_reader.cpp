@@ -1,4 +1,5 @@
 #include <sar/io/mapped_file_reader.hpp>
+#include <iostream>
 
 namespace sar::io {
 
@@ -11,50 +12,36 @@ MappedFileReader::~MappedFileReader() {
 }
 
 MappedFileReader::MappedFileReader(MappedFileReader&& other) noexcept
-#if defined(_WIN32) || defined(_WIN64)
-    : file_handle_(other.file_handle_)
-    , map_handle_(other.map_handle_)
-#else
-    : fd_(other.fd_)
-#endif
-    , data_(other.data_)
-    , file_size_(other.file_size_)
+    : guard_(std::move(other.guard_))
 {
-#if defined(_WIN32) || defined(_WIN64)
-    other.file_handle_ = INVALID_HANDLE_VALUE;
-    other.map_handle_  = NULL;
-#else
-    other.fd_ = -1;
-#endif
-    other.data_ = nullptr;
-    other.file_size_ = 0;
+    data_.store(other.data_.load(std::memory_order_acquire), std::memory_order_release);
+    file_size_.store(other.file_size_.load(std::memory_order_acquire), std::memory_order_release);
+
+    other.data_.store(nullptr, std::memory_order_release);
+    other.file_size_.store(0, std::memory_order_release);
 }
 
 MappedFileReader& MappedFileReader::operator=(MappedFileReader&& other) noexcept {
     if (this != &other) {
         close();
-#if defined(_WIN32) || defined(_WIN64)
-        file_handle_ = other.file_handle_;
-        map_handle_  = other.map_handle_;
-        other.file_handle_ = INVALID_HANDLE_VALUE;
-        other.map_handle_  = NULL;
-#else
-        fd_ = other.fd_;
-        other.fd_ = -1;
-#endif
-        data_ = other.data_;
-        file_size_ = other.file_size_;
-        other.data_ = nullptr;
-        other.file_size_ = 0;
+        std::lock_guard<std::mutex> lk1(open_mutex_);
+        std::lock_guard<std::mutex> lk2(other.open_mutex_);
+        guard_ = std::move(other.guard_);
+        data_.store(other.data_.load(std::memory_order_acquire), std::memory_order_release);
+        file_size_.store(other.file_size_.load(std::memory_order_acquire), std::memory_order_release);
+        other.data_.store(nullptr, std::memory_order_release);
+        other.file_size_.store(0, std::memory_order_release);
     }
     return *this;
 }
 
 void MappedFileReader::open(const std::string& filepath) {
+    std::lock_guard<std::mutex> lock(open_mutex_);
+
     close();
 
 #if defined(_WIN32) || defined(_WIN64)
-    file_handle_ = CreateFileA(
+    HANDLE file_handle = CreateFileA(
         filepath.c_str(),
         GENERIC_READ,
         FILE_SHARE_READ,
@@ -63,107 +50,94 @@ void MappedFileReader::open(const std::string& filepath) {
         FILE_ATTRIBUTE_NORMAL | FILE_FLAG_RANDOM_ACCESS,
         NULL
     );
-    if (file_handle_ == INVALID_HANDLE_VALUE) {
+    if (file_handle == INVALID_HANDLE_VALUE) {
         throw IOException("Failed to open file: " + filepath);
     }
 
     LARGE_INTEGER li_size;
-    if (!GetFileSizeEx(file_handle_, &li_size)) {
-        CloseHandle(file_handle_);
-        file_handle_ = INVALID_HANDLE_VALUE;
+    if (!GetFileSizeEx(file_handle, &li_size)) {
+        CloseHandle(file_handle);
         throw IOException("Failed to get file size: " + filepath);
     }
-    file_size_ = static_cast<UInt64>(li_size.QuadPart);
+    const UInt64 fsize = static_cast<UInt64>(li_size.QuadPart);
 
-    if (file_size_ == 0) {
-        CloseHandle(file_handle_);
-        file_handle_ = INVALID_HANDLE_VALUE;
+    if (fsize == 0) {
+        CloseHandle(file_handle);
         throw IOException("File is empty: " + filepath);
     }
 
-    map_handle_ = CreateFileMappingA(
-        file_handle_,
+    HANDLE map_handle = CreateFileMappingA(
+        file_handle,
         NULL,
         PAGE_READONLY,
         0, 0,
         NULL
     );
-    if (map_handle_ == NULL) {
-        CloseHandle(file_handle_);
-        file_handle_ = INVALID_HANDLE_VALUE;
+    if (map_handle == NULL) {
+        CloseHandle(file_handle);
         throw IOException("Failed to create file mapping: " + filepath);
     }
 
-    data_ = static_cast<UInt8*>(MapViewOfFile(
-        map_handle_,
+    void* mapped = MapViewOfFile(
+        map_handle,
         FILE_MAP_READ,
         0, 0, 0
-    ));
-    if (data_ == nullptr) {
-        CloseHandle(map_handle_);
-        map_handle_ = NULL;
-        CloseHandle(file_handle_);
-        file_handle_ = INVALID_HANDLE_VALUE;
+    );
+    if (mapped == nullptr) {
+        CloseHandle(map_handle);
+        CloseHandle(file_handle);
         throw IOException("Failed to map view of file: " + filepath);
     }
+
+    auto* byte_ptr = static_cast<UInt8*>(mapped);
+    guard_ = Ptr<MappedFileGuard>(new MappedFileGuard(file_handle, map_handle, mapped, fsize));
+
+    file_size_.store(fsize, std::memory_order_release);
+    data_.store(byte_ptr, std::memory_order_release);
 #else
-    fd_ = ::open(filepath.c_str(), O_RDONLY);
-    if (fd_ < 0) {
+    int fd = ::open(filepath.c_str(), O_RDONLY);
+    if (fd < 0) {
         throw IOException("Failed to open file: " + filepath);
     }
 
     struct stat st;
-    if (::fstat(fd_, &st) != 0) {
-        ::close(fd_);
-        fd_ = -1;
+    if (::fstat(fd, &st) != 0) {
+        ::close(fd);
         throw IOException("Failed to stat file: " + filepath);
     }
-    file_size_ = static_cast<UInt64>(st.st_size);
+    const UInt64 fsize = static_cast<UInt64>(st.st_size);
 
-    if (file_size_ == 0) {
-        ::close(fd_);
-        fd_ = -1;
+    if (fsize == 0) {
+        ::close(fd);
         throw IOException("File is empty: " + filepath);
     }
 
-    void* ptr = ::mmap(nullptr, file_size_, PROT_READ, MAP_PRIVATE, fd_, 0);
+    void* ptr = ::mmap(nullptr, fsize, PROT_READ, MAP_PRIVATE, fd, 0);
     if (ptr == MAP_FAILED) {
-        ::close(fd_);
-        fd_ = -1;
+        ::close(fd);
         throw IOException("Failed to mmap file: " + filepath);
     }
 
-    data_ = static_cast<UInt8*>(ptr);
+    ::madvise(ptr, fsize, MADV_SEQUENTIAL);
 
-    ::madvise(data_, file_size_, MADV_SEQUENTIAL);
+    auto* byte_ptr = static_cast<UInt8*>(ptr);
+    guard_ = Ptr<MappedFileGuard>(new MappedFileGuard(fd, ptr, fsize));
+
+    file_size_.store(fsize, std::memory_order_release);
+    data_.store(byte_ptr, std::memory_order_release);
 #endif
 }
 
 void MappedFileReader::close() noexcept {
-#if defined(_WIN32) || defined(_WIN64)
-    if (data_ != nullptr) {
-        UnmapViewOfFile(data_);
-        data_ = nullptr;
+    std::lock_guard<std::mutex> lock(open_mutex_);
+
+    data_.store(nullptr, std::memory_order_release);
+    file_size_.store(0, std::memory_order_release);
+
+    if (guard_) {
+        guard_->release();
+        guard_.reset();
     }
-    if (map_handle_ != NULL) {
-        CloseHandle(map_handle_);
-        map_handle_ = NULL;
-    }
-    if (file_handle_ != INVALID_HANDLE_VALUE) {
-        CloseHandle(file_handle_);
-        file_handle_ = INVALID_HANDLE_VALUE;
-    }
-#else
-    if (data_ != nullptr && fd_ >= 0) {
-        ::munmap(data_, file_size_);
-        data_ = nullptr;
-    }
-    if (fd_ >= 0) {
-        ::close(fd_);
-        fd_ = -1;
-    }
-#endif
-    file_size_ = 0;
 }
 
 }

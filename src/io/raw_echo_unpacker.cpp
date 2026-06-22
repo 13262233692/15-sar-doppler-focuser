@@ -129,7 +129,8 @@ void RawEchoUnpacker::unpack_range_line(UInt64 azimuth_idx,
     }
 
     const UInt64 offset = header_offset_ + azimuth_idx * bytes_per_range_line();
-    const UInt8* raw = reader_.data() + offset;
+    const UInt64 required = bytes_per_range_line();
+    const UInt8* raw = reader_.safe_ptr(offset, required);
 
     switch (meta_.sample_format) {
         case SampleFormat::COMPLEX_INT8:
@@ -167,6 +168,7 @@ void RawEchoUnpacker::unpack_range_block(UInt64 azimuth_start,
         throw InvalidParameterException("block out of range");
     }
     out_block.resize(azimuth_count, meta_.range_samples);
+    out_block.reset_watermark();
 
     if (progress_) {
         progress_->start_stage("Unpacking echo data", azimuth_count);
@@ -174,10 +176,16 @@ void RawEchoUnpacker::unpack_range_block(UInt64 azimuth_start,
 
     #pragma omp parallel for schedule(dynamic)
     for (Int64 i = 0; i < static_cast<Int64>(azimuth_count); ++i) {
-        auto line = out_block.row(static_cast<UInt64>(i));
-        unpack_range_line(azimuth_start + static_cast<UInt64>(i), line);
+        const UInt64 row_idx = static_cast<UInt64>(i);
+        auto line = out_block.row(row_idx);
+        unpack_range_line(azimuth_start + row_idx, line);
+
+        out_block.ensure_row_watermark(row_idx);
+
         if (progress_) progress_->update();
     }
+
+    out_block.ensure_row_watermark(azimuth_count - 1);
 
     if (progress_) {
         progress_->finish_stage();

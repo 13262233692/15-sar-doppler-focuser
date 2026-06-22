@@ -44,7 +44,7 @@ void RangeCompressor::build_matched_filter() {
     std::vector<Complex> chirp(static_cast<size_t>(N), Complex(0, 0));
     const Real K = B / T;
     const Int64 N0 = std::min(N, static_cast<Int64>(T * fs));
-    const Real t0 = -T / 2.0;
+    const Real t0 = -T / 2.0f;
     const Real dt = 1.0f / fs;
 
     for (Int64 i = 0; i < N0; ++i) {
@@ -98,14 +98,16 @@ void RangeCompressor::compress(ComplexMatrix& echo_data) const {
         progress_->start_stage("Range compression", static_cast<UInt64>(rows));
     }
 
+    echo_data.reset_watermark();
+
     #pragma omp parallel for schedule(dynamic) num_threads(fft_engine_->num_threads())
     for (Int64 r = 0; r < rows; ++r) {
-        auto row = echo_data.row(static_cast<UInt64>(r));
+        auto row_span = echo_data.row(static_cast<UInt64>(r));
         std::vector<Complex> buf(static_cast<size_t>(cols_pow2), Complex(0, 0));
 
         for (Int64 c = 0; c < cols; ++c) {
             Real w = apply_window_ ? window_coeffs_[static_cast<size_t>(c)] : 1.0f;
-            buf[static_cast<size_t>(c)] = row[static_cast<size_t>(c)] * w;
+            buf[static_cast<size_t>(c)] = row_span[static_cast<size_t>(c)] * w;
         }
 
         fft_engine_->fft_1d(buf, fft::FFTDirection::FORWARD);
@@ -119,11 +121,15 @@ void RangeCompressor::compress(ComplexMatrix& echo_data) const {
         fft_engine_->fft_1d(buf, fft::FFTDirection::INVERSE);
 
         for (Int64 c = 0; c < cols; ++c) {
-            row[static_cast<size_t>(c)] = buf[static_cast<size_t>(c)];
+            row_span[static_cast<size_t>(c)] = buf[static_cast<size_t>(c)];
         }
+
+        echo_data.ensure_row_watermark(static_cast<UInt64>(r));
 
         if (progress_) progress_->update();
     }
+
+    echo_data.ensure_row_watermark(static_cast<UInt64>(rows - 1));
 
     if (progress_) {
         progress_->finish_stage();
@@ -286,6 +292,7 @@ void RangeCellMigrationCorrector::correct(ComplexMatrix& range_compressed) const
 
     ComplexMatrix az_freq_data(Naz, Nr);
     ComplexMatrix result(Naz, Nr);
+    result.reset_watermark();
 
     for (Int64 r = 0; r < Nr; ++r) {
         std::vector<Complex> col(static_cast<size_t>(Naz));
@@ -334,8 +341,12 @@ void RangeCellMigrationCorrector::correct(ComplexMatrix& range_compressed) const
             result.at(static_cast<UInt64>(a), static_cast<UInt64>(r)) = tmp_out[static_cast<size_t>(r)];
         }
 
+        result.ensure_row_watermark(static_cast<UInt64>(a));
+
         if (progress_) progress_->update(static_cast<UInt64>(Nr));
     }
+
+    result.ensure_row_watermark(static_cast<UInt64>(Naz - 1));
 
     engine.fft_cols(result, fft::FFTDirection::INVERSE);
     range_compressed = std::move(result);
@@ -355,7 +366,7 @@ void DopplerEstimator::configure(const SARMetadata& meta) {
 
 Real DopplerEstimator::estimate_centroid(
     const ComplexMatrix& range_compressed,
-    fft::FFTEngine* fft_engine) const {
+    fft::FFTEngine*) const {
 
     const Int64 Naz = static_cast<Int64>(range_compressed.rows());
     const Int64 Nr  = static_cast<Int64>(range_compressed.cols());
@@ -385,6 +396,7 @@ Real DopplerEstimator::estimate_centroid(
     const Complex acf_sum2(acf_re2, acf_im2);
 
     const Real phase1 = std::arg(acf_sum);
+    (void)phase1;
     const Real phaseN = std::arg(acf_sum2);
     const Real dphi = phaseN / static_cast<Real>(end_lag);
     Real fd = dphi * meta_.prf_hz / TWO_PI;
@@ -497,6 +509,8 @@ void AzimuthCompressor::compress(ComplexMatrix& range_rcmc_data) {
         progress_->start_stage("Azimuth compression", static_cast<UInt64>(Nr));
     }
 
+    range_rcmc_data.reset_watermark();
+
     #pragma omp parallel for schedule(dynamic) num_threads(fft_engine_->num_threads())
     for (Int64 r = 0; r < Nr; ++r) {
         std::vector<Complex> ref_func(static_cast<size_t>(Naz_fft));
@@ -531,6 +545,8 @@ void AzimuthCompressor::compress(ComplexMatrix& range_rcmc_data) {
 
         if (progress_) progress_->update();
     }
+
+    range_rcmc_data.ensure_row_watermark(static_cast<UInt64>(Naz - 1));
 
     if (progress_) {
         progress_->finish_stage();
